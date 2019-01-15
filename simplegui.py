@@ -8,7 +8,10 @@ import re #extract string
 #Example showing quick prototype of the simpleGUI for foosball table, using tkinter and the
 #simple pack organization. This code is written for python3.5
 
-#Version 1
+#Version 1.1
+#Changes: modify code to allow for new sensor setup.
+#Add start of game routine and game modes and end of game routine.
+
 
 class Foosball_app():
 
@@ -24,20 +27,27 @@ class Foosball_app():
 	#Structure of GUI, instance variables
         self.lbl_red = GUI_instance.Label(text="a", bg="red", fg="white", font=("Arial Bold", 200))
         self.lbl_blue = GUI_instance.Label(text="b", bg="blue", fg="white", font=("Arial Bold", 200))
+		#This is in case the user decides for a timed game!!! :)
+		self.lbl_black = GUI_instance.Label(text = "" bg = "black" fg ="white" font =("Arial Bold", 100))
+		self.lbl_black.pack(side = "bottom", fill = "x", expand = "yes")
         self.lbl_red.pack(side = "left", fill = "both", expand = "yes")
         self.lbl_blue.pack(side = "left", fill = "both", expand = "yes")
         self.red_score = 0
         self.blue_score = 0
+		self.time = 0
+		self.flag = 0
         self.temp_string = ""
         self.found = ""
 
-	#run the endless GUI logic
-        self.update_score()
+	#run the startup method.
+		game_start(self)
 	#open the Tk window
         self.root.mainloop()
 
-    #Permanent method that updates text and reads from Arduino
-    def update_score(self):
+    #Permanent method that updates text and reads from Arduino, NEW: timed determines if we have a timer.
+	#If timed is 0, we don't have a timer. If timed is 1, we have a timer.
+	#Dont forget about overtime - Jordan Wang :)
+    def update_score_not_timed(self):
 
         self.lbl_red.configure(text=self.red_score) #self.found
         self.lbl_blue.configure(text=self.blue_score) #self.temp_string
@@ -57,20 +67,97 @@ class Foosball_app():
         #addition step, update score parameters
         if self.found == "R1 B0":
             self.red_score = self.red_score +1
+			self.sleep()
         elif self.found == "R0 B1":
             self.blue_score = self.blue_score +1
-
+			self.sleep()
         #score checks, win by 2 rule
         if (((self.blue_score > 10) | (self.red_score > 10)) & ((self.blue_score >= (self.red_score +2)))):
                 self.blue_score = 0
                 self.red_score = 0
+				self.game_start()
         #I know this is redundant
         if (((self.blue_score > 10) | (self.red_score > 10)) & ((self.red_score >= (self.blue_score +2)))):
                 self.blue_score = 0
                 self.red_score = 0
-        self.root.after(10, self.update_score) #check every ten ms. , and run the method
-                                                 #again.        
+				self.game_start()
+        self.root.after(10, self.update_score_not_timed) #check every ten ms. , and run the method
+                                                 #again.
+									
+		#Implements a single threaded timer for the python program.
+def update_score_timed(self):
+		
+        self.lbl_red.configure(text=self.red_score) #self.found
+        self.lbl_blue.configure(text=self.blue_score) #self.temp_string
+		#Initialize timer for 10 minutes.
+		if self.flag ==0:
+			self.time=time.time()
+			self.flag = 1
+		
+		self.lbl_black.configure(text=time.time() - self.time)
+		if (time.time() - self.time) > 600:
+			self.lbl_black(text="GAME OVER")
+			self.blue_score = 0
+            self.red_score = 0
+			self.time=0
+			self.flag=0
+			self.game_start()
+			
+        #subroutine to parse through the serial port input
+        self.temp_string = self.port.read(12).decode("utf-8")
+					#Will get at least one portion of
+					#byte stream that is not cut off
+        #find first instance of red
+        #cut it off
+        try:
+            self.found = re.search('\n(.+?)\n', self.temp_string).group(1)
+        except AttributeError:
+	    # AAA, ZZZ not found in the original string
+            self.found = "R0 B0"#Default to nothing
+        #Assume we have a string, lazy:
+        #addition step, update score parameters
+        if self.found == "R1 B0":
+            self.red_score = self.red_score +1
+			self.sleep()
+        elif self.found == "R0 B1":
+            self.blue_score = self.blue_score +1
+			self.sleep()
+        #score checks, win by 2 rule
+        if (((self.blue_score > 10) | (self.red_score > 10)) & ((self.blue_score >= (self.red_score +2)))):
+                self.blue_score = 0
+                self.red_score = 0
+				self.game_start()
+        #I know this is redundant
+        if (((self.blue_score > 10) | (self.red_score > 10)) & ((self.red_score >= (self.blue_score +2)))):
+                self.blue_score = 0
+                self.red_score = 0
+				self.game_start()
+        self.root.after(10, self.update_score_timed) #check every ten ms. , and run the method
+                                                 #again.
+												 
+		#Stop checking for the score for a brief amount of time.
+	def sleep(self):
+		time.sleep(4)
 
+	def game_start(self):
+		self.lbl_red = GUI_instance.Label(text="<-Start 10 min. game", bg="red", fg="white", font=("Arial Bold", 200))
+        self.lbl_blue = GUI_instance.Label(text="Start non timed game->", bg="blue", fg="white", font=("Arial Bold", 200))
+		#Above: descriptive names for selection. If the user chooses to place the ball in the blue goal, then 
+		#start game as usual, otherwise, if the player places the ball in the red goal, start a timer.
+		
+		#Selection criteria for timed/non timed game.
+		try:
+            self.found = re.search('\n(.+?)\n', self.temp_string).group(1)
+        except AttributeError:
+	    # AAA, ZZZ not found in the original string
+            self.found = "R0 B0"#Default to nothing
+        #Assume we have a string, lazy:
+        #addition step, update score parameters
+		if self.found == "R1 B0":
+            self.update_score_not_timed()
+        elif self.found == "R0 B1":
+            self.update_score_timed()#need to change this!
+		
 #Instatiate app
 app=Foosball_app()
 
