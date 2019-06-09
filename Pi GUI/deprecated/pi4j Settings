@@ -1,0 +1,10 @@
+The Pi4J JAR files are located at:
+/opt/pi4j/lib
+
+Example Java programs are located at:
+/opt/pi4j/examples
+
+You can compile the examples using this script:
+sudo /opt/pi4j/examples/build
+
+Please see http://www.pi4j.com for more information.
